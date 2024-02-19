@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useEffect, useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -25,6 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import {
   aspectRatioOptions,
+  creditFee,
   defaultValues,
   transformationTypes,
 } from "@/constants";
@@ -37,6 +38,7 @@ import { updateCredits } from "@/lib/actions/user.actions";
 import { getCldImageUrl } from "next-cloudinary";
 import { addImage, updateImage } from "@/lib/actions/image.actions";
 import { useRouter } from "next/navigation";
+import { InsufficientCreditsModal } from "./InsufficentCreditsModal";
 
 export const formSchema = z.object({
   title: z.string(),
@@ -175,7 +177,7 @@ const TransformationForm = ({
     return onChangeField(value);
   };
 
-  const onTansformHandler = async () => {
+  const onTransformHandler = async () => {
     setIsTransforming(true);
     setTransformationConfig(
       deepMergeObjects(newTransformation, transformationConfig)
@@ -183,14 +185,21 @@ const TransformationForm = ({
     setNewTransformation(null);
 
     startTransition(async () => {
-      await updateCredits(userId, -1);
+      await updateCredits(userId, creditFee);
     });
   };
+
+  useEffect(() => {
+    if (image && (type === "restore" || type === "removeBackground")) {
+      setNewTransformation(transformationType.config);
+    }
+  }, [image, transformationType.config, type]);
   return (
     <div>
       {" "}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          {creditBalance < Math.abs(creditFee) && <InsufficientCreditsModal />}
           <CustomField
             control={form.control}
             name="title"
@@ -303,7 +312,7 @@ const TransformationForm = ({
               type="button"
               className="submit-button capitalize"
               disabled={isTransforming || newTransformation === null}
-              onClick={onTansformHandler}
+              onClick={onTransformHandler}
             >
               {isTransforming ? "Transforming..." : "Apply Transformations"}
             </Button>
@@ -312,7 +321,7 @@ const TransformationForm = ({
               className="submit-button capitalize"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Sunmitting..." : "Save Image"}
+              {isSubmitting ? "Submitting..." : "Save Image"}
             </Button>
           </div>
         </form>
