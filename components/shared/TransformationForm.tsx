@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -29,7 +29,8 @@ import {
   transformationTypes,
 } from "@/constants";
 import { CustomField } from "./CustomField";
-import { AspectRatioKey } from "@/lib/utils";
+import { AspectRatioKey, debounce, deepMergeObjects } from "@/lib/utils";
+import { start } from "repl";
 
 export const formSchema = z.object({
   title: z.string(),
@@ -49,11 +50,12 @@ const TransformationForm = ({
 }: TransformationFormProps) => {
   const transformationType = transformationTypes[type];
   const [image, setImage] = useState("");
-  const [newTransformation, setNewTransformation] = useState(null);
-  useState<Transformations | null>(null);
+  const [newTransformation, setNewTransformation] =
+    useState<Transformations | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTransforming, setIsTransforming] = useState(false);
   const [transformationConfig, setTransformationConfig] = useState(config);
+  const [isPending, startTransition] = useTransition();
   const initialValues =
     data && action === "Update"
       ? {
@@ -76,16 +78,48 @@ const TransformationForm = ({
   const onSelectFieldHandler = (
     value: string,
     onChangeField: (value: string) => void
-  ) => {};
+  ) => {
+    const imageSize = aspectRatioOptions[value as AspectRatioKey];
+    setImage((prevState: any) => ({
+      ...prevState,
+      aspectRatio: imageSize.aspectRatio,
+      width: imageSize.width,
+      height: imageSize.height,
+    }));
+    setNewTransformation(transformationType.config);
+    return onChangeField(value);
+  };
 
   const onInputChangeHandler = (
     fieldName: string,
     value: string,
     type: string,
     onChangeField: (value: string) => void
-  ) => {};
+  ) => {
+    debounce(() => {
+      setNewTransformation((prevState: any) => ({
+        ...prevState,
+        [type]: {
+          ...prevState?.[type],
+          [fieldName === "prompt" ? "prompt" : "to"]: value,
+        },
+      }));
+    }, 1000);
 
-  const onTansformHandler = () => {};
+    return onChangeField(value);
+  };
+  // needs to be updated to updateCredit
+  const onTansformHandler = async () => {
+    setIsTransforming(true);
+    setTransformationConfig(
+      deepMergeObjects(newTransformation, transformationConfig)
+    );
+    setNewTransformation(null);
+
+    startTransition(async()=>{
+      // await updateCredits(userId,creditFree)
+    })
+  };
   return (
     <div>
       {" "}
@@ -174,7 +208,7 @@ const TransformationForm = ({
               )}
             </div>
           )}
-          <div className="flex flex-colgap-4">
+          <div className="flex flex-col gap-4">
             <Button
               type="button"
               className="submit-button capitalize"
